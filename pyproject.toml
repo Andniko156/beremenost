@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pregnancy-monitor-experiment"
+version = "0.1.0"
+description = "Reproducible Chronos-2 heart-rate forecasting experiment"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26,<3", "pandas>=2.2,<4"]
+
+[project.optional-dependencies]
+chronos = ["chronos-forecasting==2.3.2", "transformers==4.57.6", "torch>=2.8,<3"]
+
+[project.scripts]
+pregnancy-monitor = "pregnancy_monitor.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pregnancy_monitor*"]

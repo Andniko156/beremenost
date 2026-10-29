@@ -1,0 +1,98 @@
+import argparse
+from dataclasses import asdict
+import hashlib
+from importlib.metadata import version
+import json
+from pathlib import Path
+import sys
+import time
+
+from .data import ExperimentConfig, read_csv, synthetic_data
+from .evaluation import backtest
+from .forecast import MODEL_ID, MODEL_REVISION, ChronosForecaster, PersistenceForecaster, forecast_frame
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="Сохраняя главное: эксперимент прогноза ЧСС")
+    sub = parser.add_subparsers(dest="command", required=True)
+    generate = sub.add_parser("generate", help="Create synthetic engineering data")
+    generate.add_argument("--output", default="data/synthetic_hr.csv")
+    generate.add_argument("--days", type=int, default=3)
+    generate.add_argument("--series", type=int, default=2)
+    generate.add_argument("--seed", type=int, default=42)
+    generate.add_argument("--interval-minutes", type=int, default=5)
+    for command in ("forecast", "backtest"):
+        run = sub.add_parser(command)
+        run.add_argument("--input", required=True)
+        run.add_argument("--output-dir", default=f"outputs/{command}")
+        run.add_argument("--backend", choices=["chronos2", "persistence"], default="chronos2")
+        run.add_argument("--interval-minutes", type=int, default=5)
+        run.add_argument("--history-steps", type=int, default=288)
+        run.add_argument("--horizon-steps", type=int, default=12)
+        run.add_argument("--model", default=MODEL_ID)
+        run.add_argument("--revision", default=MODEL_REVISION)
+        run.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+        run.add_argument("--offline", action="store_true", help="Load cached/local weights without Hub requests")
+        run.add_argument("--data-kind", choices=["synthetic", "device", "unknown"], default="unknown")
+        if command == "backtest":
+            run.add_argument("--folds", type=int, default=3)
+    return parser
+
+
+def run(args):
+    if args.command == "generate":
+        path = Path(args.output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        frame = synthetic_data(args.days, args.series, args.seed, args.interval_minutes)
+        frame.to_csv(path, index=False)
+        write_json(path.with_suffix(".metadata.json"), {
+            "data_kind": "synthetic", "seed": args.seed, "rows": len(frame),
+            "interval_minutes": args.interval_minutes, "clinical_validity": "not evaluated",
+        })
+        print(f"Synthetic data: {path} ({len(frame)} rows). Not patient observations.")
+        return
+    config = ExperimentConfig(args.interval_minutes, args.history_steps, args.horizon_steps)
+    frame = read_csv(args.input, config)
+    # Check evaluation length before spending time downloading/loading weights.
+    if args.command == "backtest":
+        required = config.history_steps + args.folds * config.horizon_steps
+        if args.folds < 1 or (frame.groupby("series_id").size() < required).any():
+            raise ValueError(f"Backtest requires positive folds and at least {required} rows per series")
+    started = time.perf_counter()
+    model = (PersistenceForecaster() if args.backend == "persistence" else
+             ChronosForecaster(args.model, args.revision, args.device, args.offline))
+    report = {}
+    if args.command == "forecast":
+        rows = forecast_frame(frame, config, model)
+    else:
+        rows, report = backtest(frame, config, model, args.folds)
+    report.update({
+        "experiment": asdict(config), "horizon_minutes": config.interval_minutes * config.horizon_steps,
+        "model": model.metadata(), "data_kind": args.data_kind,
+        "clinical_validity": "not evaluated", "elapsed_seconds_including_model_load": time.perf_counter() - started,
+        "series_count": int(frame.series_id.nunique()),
+        "input_sha256": hashlib.sha256(Path(args.input).read_bytes()).hexdigest(),
+        "runtime": {"python": sys.version.split()[0], "numpy": version("numpy"), "pandas": version("pandas")},
+        "input_last_timestamps": {str(key): value.isoformat()
+                                  for key, value in frame.groupby("series_id").timestamp.max().items()},
+    })
+    output = Path(args.output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    rows.to_csv(output / "predictions.csv", index=False)
+    write_json(output / "report.json", report)
+    print(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
+    print(f"Saved to {output}")
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    try:
+        run(args)
+    except (ValueError, RuntimeError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    return 0
