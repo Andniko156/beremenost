@@ -15,6 +15,7 @@ QUANTILES = [0.1, 0.5, 0.9]
 
 class PersistenceForecaster:
     name = "persistence"
+    has_intervals = False
 
     def metadata(self):
         return {"backend": self.name, "rule": "repeat the last observed value", "intervals": False}
@@ -25,8 +26,52 @@ class PersistenceForecaster:
                                  np.full(horizon, np.nan))) for x in histories]
 
 
+class RollingMeanForecaster(PersistenceForecaster):
+    name = "rolling_mean"
+
+    def __init__(self, window=12):
+        if type(window) is not int or window < 1:
+            raise ValueError("window must be a positive integer")
+        self.window = window
+
+    def metadata(self):
+        return {"backend": self.name, "window_steps": self.window, "intervals": False}
+
+    def predict(self, histories, horizon):
+        if any(len(x) < self.window for x in histories):
+            raise ValueError("Rolling mean requires a full history window")
+        return super().predict([np.array([np.mean(x[-self.window:])]) for x in histories], horizon)
+
+
+class SeasonalForecaster(PersistenceForecaster):
+    name = "seasonal"
+
+    def __init__(self, period=288):
+        if type(period) is not int or period < 1:
+            raise ValueError("period must be a positive integer")
+        self.period = period
+
+    def metadata(self):
+        return {"backend": self.name, "period_steps": self.period, "intervals": False}
+
+    def predict(self, histories, horizon):
+        if any(len(x) < self.period for x in histories):
+            raise ValueError("Seasonal baseline requires a complete previous period")
+        return [np.column_stack((np.full(horizon, np.nan), np.resize(x[-self.period:], horizon),
+                                 np.full(horizon, np.nan))) for x in histories]
+
+
+def benchmark_baselines(config):
+    period, remainder = divmod(24 * 60, config.interval_minutes)
+    if remainder or config.history_steps < period:
+        raise ValueError("Benchmark with a daily seasonal baseline requires at least 24 hours of regular history")
+    window = min(config.history_steps, max(1, 60 // config.interval_minutes))
+    return [PersistenceForecaster(), RollingMeanForecaster(window), SeasonalForecaster(period)]
+
+
 class ChronosForecaster:
     name = "chronos2"
+    has_intervals = True
 
     def __init__(self, model=MODEL_ID, revision=MODEL_REVISION, device="cpu", offline=False):
         if offline:
@@ -80,11 +125,13 @@ def forecast_frame(validated: pd.DataFrame, config: ExperimentConfig, forecaster
         prediction = np.asarray(prediction, dtype=float)
         if prediction.shape != (config.horizon_steps, 3):
             raise ValueError("Model returned an unexpected forecast shape")
-        if not np.isfinite(prediction[:, 1]).all():
-            raise ValueError("Model returned a non-finite point forecast")
-        if forecaster.name != "persistence":
+        if not np.isfinite(prediction[:, 1]).all() or (prediction[:, 1] <= 0).any():
+            raise ValueError("Model returned a non-finite or nonpositive heart-rate point forecast")
+        if getattr(forecaster, "has_intervals", True):
             if not np.isfinite(prediction).all() or (np.diff(prediction, axis=1) < 0).any():
                 raise ValueError("Model returned invalid or crossing quantiles; do not publish the forecast")
+        elif not np.isnan(prediction[:, [0, 2]]).all():
+            raise ValueError("Point-only baselines must not fabricate uncertainty intervals")
         origin = group["timestamp"].iloc[-1]
         frames.append(pd.DataFrame({
             "series_id": series_id,
@@ -92,5 +139,7 @@ def forecast_frame(validated: pd.DataFrame, config: ExperimentConfig, forecaster
                                        freq=config.interval),
             "p10": prediction[:, 0], "p50": prediction[:, 1], "p90": prediction[:, 2],
             "backend": forecaster.name,
+            "forecast_origin": origin,
+            "horizon_step": np.arange(1, config.horizon_steps + 1),
         }))
     return pd.concat(frames, ignore_index=True)

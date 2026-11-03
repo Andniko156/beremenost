@@ -7,9 +7,9 @@ from pathlib import Path
 import sys
 import time
 
-from .data import ExperimentConfig, read_csv, synthetic_data
+from .data import SCENARIOS, ExperimentConfig, read_csv, synthetic_data
 from .evaluation import backtest
-from .forecast import MODEL_ID, MODEL_REVISION, ChronosForecaster, PersistenceForecaster, forecast_frame
+from .forecast import MODEL_ID, MODEL_REVISION, ChronosForecaster, PersistenceForecaster, benchmark_baselines, forecast_frame
 
 
 def write_json(path, value):
@@ -25,7 +25,11 @@ def build_parser():
     generate.add_argument("--series", type=int, default=2)
     generate.add_argument("--seed", type=int, default=42)
     generate.add_argument("--interval-minutes", type=int, default=5)
-    for command in ("forecast", "backtest"):
+    generate.add_argument("--scenario", choices=SCENARIOS, default="daily")
+    serve = sub.add_parser("serve", help="Run the private experimental forecast API")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+    for command in ("forecast", "backtest", "benchmark"):
         run = sub.add_parser(command)
         run.add_argument("--input", required=True)
         run.add_argument("--output-dir", default=f"outputs/{command}")
@@ -38,27 +42,37 @@ def build_parser():
         run.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
         run.add_argument("--offline", action="store_true", help="Load cached/local weights without Hub requests")
         run.add_argument("--data-kind", choices=["synthetic", "device", "unknown"], default="unknown")
-        if command == "backtest":
-            run.add_argument("--folds", type=int, default=3)
+        if command in ("backtest", "benchmark"):
+            run.add_argument("--folds", type=int, default=12 if command == "benchmark" else 3)
     return parser
 
 
 def run(args):
+    if args.command == "serve":
+        try:
+            import uvicorn
+            from .api import create_app
+        except ImportError as exc:
+            raise RuntimeError("Install API dependencies: python -m pip install -e '.[api]'") from exc
+        uvicorn.run(create_app(), host=args.host, port=args.port, access_log=False)
+        return
     if args.command == "generate":
         path = Path(args.output)
         path.parent.mkdir(parents=True, exist_ok=True)
-        frame = synthetic_data(args.days, args.series, args.seed, args.interval_minutes)
+        frame = synthetic_data(args.days, args.series, args.seed, args.interval_minutes, args.scenario)
         frame.to_csv(path, index=False)
         write_json(path.with_suffix(".metadata.json"), {
             "data_kind": "synthetic", "seed": args.seed, "rows": len(frame),
             "interval_minutes": args.interval_minutes, "clinical_validity": "not evaluated",
+            "scenario": args.scenario,
         })
         print(f"Synthetic data: {path} ({len(frame)} rows). Not patient observations.")
         return
     config = ExperimentConfig(args.interval_minutes, args.history_steps, args.horizon_steps)
     frame = read_csv(args.input, config)
     # Check evaluation length before spending time downloading/loading weights.
-    if args.command == "backtest":
+    baselines = benchmark_baselines(config) if args.command == "benchmark" else None
+    if args.command in ("backtest", "benchmark"):
         required = config.history_steps + args.folds * config.horizon_steps
         if args.folds < 1 or (frame.groupby("series_id").size() < required).any():
             raise ValueError(f"Backtest requires positive folds and at least {required} rows per series")
@@ -69,7 +83,7 @@ def run(args):
     if args.command == "forecast":
         rows = forecast_frame(frame, config, model)
     else:
-        rows, report = backtest(frame, config, model, args.folds)
+        rows, report = backtest(frame, config, model, args.folds, baselines=baselines)
     report.update({
         "experiment": asdict(config), "horizon_minutes": config.interval_minutes * config.horizon_steps,
         "model": model.metadata(), "data_kind": args.data_kind,
@@ -84,8 +98,10 @@ def run(args):
     output.mkdir(parents=True, exist_ok=True)
     rows.to_csv(output / "predictions.csv", index=False)
     write_json(output / "report.json", report)
-    print(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
-    print(f"Saved to {output}")
+    print(f"Backend: {model.name}; horizon: {report['horizon_minutes']} min; data: {args.data_kind}")
+    for name, score in report.get("aggregate", {}).items():
+        print(f"  {name}: MAE={score['mae_bpm']:.3f} bpm, RMSE={score['rmse_bpm']:.3f} bpm")
+    print(f"Saved forecasts and full report to {output}")
 
 
 def main(argv=None):
