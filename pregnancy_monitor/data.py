@@ -64,12 +64,17 @@ def read_csv(path, config):
     return validate_frame(pd.read_csv(path, dtype={"series_id": str}), config)
 
 
-def synthetic_data(days=3, series_count=2, seed=42, interval_minutes=5):
+SCENARIOS = ("daily", "trend", "shift", "noisy")
+
+
+def synthetic_data(days=3, series_count=2, seed=42, interval_minutes=5, scenario="daily"):
     """Engineering fixture only; not a simulator of pregnancy physiology."""
     if days < 1 or series_count < 1 or interval_minutes < 1:
         raise ValueError("days, series_count and interval_minutes must be positive")
     rng = np.random.default_rng(seed)
     count = days * 24 * 60 // interval_minutes
+    if count < 2 or scenario not in SCENARIOS:
+        raise ValueError(f"At least two samples and a scenario from {SCENARIOS} are required")
     timestamps = pd.date_range("2026-01-01T00:00:00Z", periods=count, freq=f"{interval_minutes}min")
     hours = np.arange(count) * interval_minutes / 60
     frames = []
@@ -80,6 +85,12 @@ def synthetic_data(days=3, series_count=2, seed=42, interval_minutes=5):
         values = 75 + 3 * i + 6 * np.sin(2 * np.pi * hours / 24) + noise
         # A deterministic activity-like excursion exercises changing trends.
         values += 8 * np.exp(-0.5 * ((hours % 24 - 17) / 0.5) ** 2)
+        if scenario == "trend":
+            values += 0.15 * hours
+        elif scenario == "shift":
+            values += 10 * (hours >= hours[-1] - 4)
+        elif scenario == "noisy":
+            values += rng.normal(0, 4, count)
         frames.append(pd.DataFrame({
             "series_id": f"synthetic_{i + 1:03d}",
             "timestamp": timestamps,
