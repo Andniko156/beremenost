@@ -60,6 +60,14 @@ def build_parser():
     study.add_argument("--cpu-threads", type=int, default=4)
     study.add_argument("--minimum-relative-improvement", type=float, default=0.01)
     study.add_argument("--offline", action="store_true")
+    ablation = sub.add_parser("ablation", help="Development-only context, past-HRV and Ridge/LoRA study")
+    ablation.add_argument("--dataset", required=True)
+    ablation.add_argument("--workbook", required=True)
+    ablation.add_argument("--output-dir", required=True)
+    ablation.add_argument("--steps", type=int, default=100)
+    ablation.add_argument("--seeds", type=int, nargs="+", default=[20261104, 20261105, 20261106])
+    ablation.add_argument("--cpu-threads", type=int, default=4)
+    ablation.add_argument("--offline", action="store_true")
     for command in ("forecast", "backtest", "benchmark"):
         run = sub.add_parser(command)
         run.add_argument("--input", required=True)
@@ -79,6 +87,11 @@ def build_parser():
 
 
 def run(args):
+    if args.command == "ablation":
+        from .ablation import run_ablation
+        run_ablation(args.dataset, args.workbook, args.output_dir, num_steps=args.steps,
+                     seeds=tuple(args.seeds), cpu_threads=args.cpu_threads, offline=args.offline)
+        return
     if args.command == "study":
         from .model_study import run_study
         run_study(args.dataset, args.output_dir, num_steps=args.steps, seed=args.seed,
