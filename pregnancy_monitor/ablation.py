@@ -15,7 +15,7 @@ from .evaluation import metrics
 from .finetuning import _parameter_hash, fit_lora_model, validation_forecasts
 from .forecast import MODEL_ID, MODEL_REVISION
 from .model_study import BASE, KEYS, POLICY, development_records, nested_folds, select_candidate, subject_errors
-from .research_data import HRV29_SHA256, ResearchProfile, load_prepared, sha256, write_json
+from .research_data import HRV29_SHA256, ResearchProfile, load_prepared, sha256, subject_split, write_json
 
 COVARIATES = ("rmssd_ibi", "sdnn_ibi")
 SEEDS = (20261104, 20261105, 20261106)
@@ -26,6 +26,12 @@ LORA_CONFIGS = (
     {"name": "lora_hr_r2_lr1e-4", "hrv": False, "rank": 2, "learning_rate": 1e-4},
 )
 RIDGE_ALPHAS = (1.0, 10.0, 100.0)
+
+
+def require_original_holdout(manifest, records):
+    subjects = {r["subject_id"] for r in records}
+    if len(subjects) != 29 or manifest["splits"] != subject_split(subjects, seed=42):
+        raise ValueError("Ablation requires the original 29-woman seed-42 split; do not redefine the old test women")
 
 
 def attach_past_hrv(workbook, records, allowed_subjects):
@@ -84,8 +90,8 @@ def forecast_rows(windows, predictions, name, horizon):
             q = np.column_stack([np.full(horizon, np.nan), q, np.full(horizon, np.nan)])
         if q.shape != (horizon, 3) or not np.isfinite(q[:, 1]).all() or (q[:, 1] <= 0).any():
             raise ValueError("Invalid point forecast")
-        finite_intervals = np.isfinite(q[:, [0, 2]])
-        if finite_intervals.any() and (not np.isfinite(q).all() or (np.diff(q, axis=1) < 0).any()):
+        point_only = np.isnan(q[:, [0, 2]]).all()
+        if not point_only and (not np.isfinite(q).all() or (np.diff(q, axis=1) < 0).any()):
             raise ValueError("Invalid forecast intervals")
         for step, (actual, interval) in enumerate(zip(record["values"][-horizon:], q), 1):
             rows.append({"backend": name, "subject_id": record["subject_id"],
@@ -214,6 +220,7 @@ def run_ablation(dataset_dir, workbook, output_dir, *, seeds=SEEDS, num_steps=10
     if not seeds or any(type(s) is not int or s < 0 for s in seeds) or len(set(seeds)) != len(seeds):
         raise ValueError("Seeds must be unique nonnegative integers")
     manifest, prepared, _ = load_prepared(dataset_dir)
+    require_original_holdout(manifest, prepared)
     subjects, records = development_records(manifest, prepared)
     records = attach_past_hrv(workbook, records, subjects)
     if any(len(r["values"]) < 18 for r in records):
@@ -347,8 +354,14 @@ def run_ablation(dataset_dir, workbook, output_dir, *, seeds=SEEDS, num_steps=10
     rows.to_csv(out / "development_predictions.csv", index=False)
     pd.concat(context_rows).to_csv(out / "context_subset_predictions.csv", index=False)
     hour_rows.to_csv(out / "hour_predictions.csv", index=False)
+    # The preparation manifest describes the earlier HR-only experiment. Its
+    # input-use note must not incorrectly describe this past-HRV experiment.
+    source = dict(manifest["source"])
+    source["limitations"] = [note for note in source.get("limitations", [])
+        if note != "Cortisol, HRV and stress labels are not model inputs"]
+    source["limitations"].append("Past RMSSD/SDNN are inputs only for declared HRV variants; future HRV, cortisol and stress labels are not inputs")
     report = {"protocol": plan["protocol"], "study_plan_sha256": sha256(out / "study_plan.json"),
-        "dataset": manifest["source"], "profile": asdict(profile), "seeds": list(seeds),
+        "dataset": source, "profile": asdict(profile), "seeds": list(seeds),
         "unique_subjects": len(subjects), "unique_targets_per_model_per_seed": len(subjects) * 6,
         "missing_covariate_points": {key: sum(v is None for r in records for v in r["past_covariates"][key])
                                      for key in COVARIATES},

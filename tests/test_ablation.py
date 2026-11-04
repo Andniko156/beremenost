@@ -12,9 +12,10 @@ import pandas as pd
 from pregnancy_monitor.ablation import (
     BASE, COVARIATES, POLICY, attach_past_hrv, fit_ridge, forecast_rows, last_windows,
     model_inputs, paired_comparison, ridge_rows, ridge_samples, run_ablation, summarize,
+    require_original_holdout,
 )
 from pregnancy_monitor.finetuning import validation_forecasts
-from pregnancy_monitor.research_data import HRV29_SHA256, ResearchProfile, save_prepared
+from pregnancy_monitor.research_data import HRV29_SHA256, ResearchProfile, save_prepared, subject_split
 
 
 def record(subject, length=24, start=80):
@@ -24,6 +25,21 @@ def record(subject, length=24, start=80):
 
 
 class AblationTests(unittest.TestCase):
+    def test_repreparing_with_a_different_seed_cannot_redefine_original_test(self):
+        records = [record(str(i)) for i in range(29)]
+        require_original_holdout({"splits": subject_split([str(i) for i in range(29)], 42)}, records)
+        with self.assertRaisesRegex(ValueError, "old test women"):
+            require_original_holdout({"splits": subject_split([str(i) for i in range(29)], 7)}, records)
+        with self.assertRaises(ValueError):
+            require_original_holdout({"splits": subject_split([str(i) for i in range(28)], 42)}, records[:-1])
+
+    def test_infinite_or_partially_missing_intervals_are_refused(self):
+        windows, _ = last_windows([record("a")], 12, 6)
+        for ends in ((-np.inf, np.inf), (np.nan, 100), (100, 60)):
+            q = np.tile([ends[0], 80, ends[1]], (6, 1))
+            with self.assertRaisesRegex(ValueError, "intervals"):
+                forecast_rows(windows, [q], "invalid", 6)
+
     def test_context_comparison_uses_identical_future_targets_and_origin(self):
         records = [record("a", 24), record("b", 21)]
         short, _ = last_windows(records, 6, 6)
@@ -162,6 +178,7 @@ class AblationTests(unittest.TestCase):
             self.assertEqual(report["aggregate"][POLICY]["unique_subjects"], 24)
             self.assertFalse(report["original_test_evaluated"])
             self.assertFalse(report["serving_model_changed"])
+            self.assertTrue(any("Past RMSSD/SDNN" in note for note in report["dataset"]["limitations"]))
 
 
 if __name__ == "__main__":
