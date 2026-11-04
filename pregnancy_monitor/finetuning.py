@@ -68,10 +68,46 @@ def evaluate_models(windows, profile, pipelines):
     return frame, report
 
 
+def validation_forecasts(pipeline, validation, profile):
+    """Predict held-out targets using past values only, including past-only covariates."""
+    histories, targets = [], []
+    for item in validation:
+        values = np.asarray(item["target"] if isinstance(item, dict) else item, dtype=np.float32)
+        if values.ndim != 1 or len(values) < profile.context_steps + profile.prediction_steps:
+            raise ValueError("Validation series must contain context and complete target")
+        split = len(values) - profile.prediction_steps
+        history = values[:split]
+        if isinstance(item, dict):
+            if item.get("future_covariates"):
+                raise ValueError("This research evaluator supports past-only covariates")
+            covariates = {}
+            for key, series in item.get("past_covariates", {}).items():
+                series = np.asarray(series, dtype=np.float32)
+                if series.shape != values.shape:
+                    raise ValueError("Covariates and target must have aligned time axes")
+                covariates[key] = series[:split]
+            history = {"target": history, "past_covariates": covariates}
+        histories.append(history)
+        targets.append(values[split:])
+    qs, _ = pipeline.predict_quantiles(
+        histories, context_length=profile.context_steps, prediction_length=profile.prediction_steps,
+        quantile_levels=QUANTILES, cross_learning=False, batch_size=8)
+    if len(qs) != len(validation):
+        raise RuntimeError("Validation forecast count differs from validation targets")
+    predictions = []
+    for q in qs:
+        q = q.detach().cpu().numpy()[0]
+        if (q.shape != (profile.prediction_steps, 3) or not np.isfinite(q).all()
+                or (q[:, 1] <= 0).any() or (np.diff(q, axis=1) < 0).any()):
+            raise RuntimeError("Invalid validation forecast shape, values or quantiles")
+        predictions.append(q)
+    return predictions, np.asarray(targets)
+
+
 def fit_lora_model(base, train, validation, profile, output_dir, *, num_steps=100,
                    batch_size=4, learning_rate=1e-5, rank=8, seed=42,
                    selection_metric="eval_loss", parent_revision=MODEL_REVISION,
-                   validation_subjects=None):
+                   validation_subjects=None, eval_steps=None):
     """Train without reading any test observations; return the selected adapter and audit."""
     import peft  # noqa: F401; required before upstream can silently fall back to full training
     from chronos import Chronos2Pipeline
@@ -101,15 +137,8 @@ def fit_lora_model(base, train, validation, profile, output_dir, *, num_steps=10
             if selection_metric != "eval_forecast_mae":
                 return
             was_training = model.training
-            pipeline = Chronos2Pipeline(model=model)
-            qs, _ = pipeline.predict_quantiles(
-                [np.asarray(x, dtype=np.float32)[:-profile.prediction_steps] for x in validation],
-                context_length=profile.context_steps, prediction_length=profile.prediction_steps,
-                quantile_levels=QUANTILES, cross_learning=False, batch_size=8)
-            errors = [float(np.abs(q.detach().cpu().numpy()[0, :, 1] - x[-profile.prediction_steps:]).mean())
-                      for q, x in zip(qs, validation)]
-            if len(qs) != len(validation):
-                raise RuntimeError("Validation forecast count differs from validation targets")
+            predictions, targets = validation_forecasts(Chronos2Pipeline(model=model), validation, profile)
+            errors = np.abs(np.asarray(predictions)[:, :, 1] - targets).mean(axis=1)
             value = float(pd.Series(errors).groupby(validation_subjects).mean().mean())
             if not np.isfinite(value):
                 raise RuntimeError("Nonfinite validation forecast MAE")
@@ -125,7 +154,9 @@ def fit_lora_model(base, train, validation, profile, output_dir, *, num_steps=10
                 events["best_validation_loss"] = state.best_metric
             write_json(out / "trainer_history.json", state.log_history)
 
-    eval_steps = max(1, min(25, num_steps))
+    eval_steps = max(1, min(25, num_steps)) if eval_steps is None else eval_steps
+    if type(eval_steps) is not int or not 1 <= eval_steps <= num_steps:
+        raise ValueError("Evaluation interval must be within the training budget")
     tuned = base.fit(train, prediction_length=profile.prediction_steps, validation_inputs=validation,
                      context_length=profile.context_steps, min_past=profile.context_steps,
                      finetune_mode="lora", lora_config={"r": rank, "lora_alpha": 2 * rank,
