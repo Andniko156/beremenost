@@ -1,0 +1,1032 @@
+{
+  "dataset": {
+    "dataset_id": "hrv29_zenodo_7102622",
+    "url": "https://zenodo.org/api/records/7102622/files/maternal_ECG_cortisol_data_FINAL.xlsx/content",
+    "doi": "10.7280/D12Q4P",
+    "license": "CC0-1.0",
+    "sha256": "bed2512b7b99c9a4c69f4c6fe61e3a698abe53208fe36e602755edfca4b3ac8a",
+    "measurement": "ECG-derived HR aggregated in sequential five-minute source windows",
+    "limitations": [
+      "29 participants; 28-32 weeks of pregnancy",
+      "Only non-stress visits are long enough for the default one-hour target",
+      "No raw ECG, signal-quality labels, device-specific validation or clinical outcomes",
+      "Cortisol, HRV and stress labels are not model inputs"
+    ]
+  },
+  "profile": {
+    "interval_minutes": 5,
+    "context_steps": 6,
+    "prediction_steps": 12
+  },
+  "seed": 42,
+  "init_model": "amazon/chronos-2",
+  "base_revision": "29ec3766d36d6f73f0696f85560a422f50e8498c",
+  "training": {
+    "mode": "lora",
+    "steps": 100,
+    "batch_size": 4,
+    "learning_rate": 1e-05,
+    "cpu_threads": 4,
+    "device": "cpu",
+    "seconds_including_model_load": 57.617481870999995,
+    "trainable_parameters": 1206912,
+    "total_parameters": 120684576,
+    "initial_adapter_sha256": "01b024205f224fbdeb99cc360dfd11a39ae218d15b659cf1ee7e7d713d9c84a6",
+    "completed_steps": 100,
+    "best_validation_checkpoint": "checkpoint-100",
+    "best_validation_loss": 7.819239139556885,
+    "final_adapter_sha256": "d9316861a411bddd5016dbc58693b804e170514958b17300fae5662b3944e4de",
+    "base_pipeline_unchanged": true,
+    "trainer_runtime_seconds": 23.4928
+  },
+  "counts": {
+    "subjects": {
+      "train": 20,
+      "validation": 4,
+      "test": 5
+    },
+    "training_windows": 102,
+    "validation_windows": 4,
+    "test_windows": 5
+  },
+  "runtime": {
+    "torch": "2.8.0+cpu",
+    "chronos-forecasting": "2.3.2",
+    "transformers": "4.57.6",
+    "peft": "0.18.1"
+  },
+  "validation": {
+    "aggregate": {
+      "chronos2_base": {
+        "n": 48,
+        "mae_bpm": 2.4737935066223145,
+        "rmse_bpm": 3.132274042722031,
+        "coverage_p10_p90": 1.0,
+        "mean_interval_width_bpm": 23.652345021565754,
+        "pinball_loss_bpm": {
+          "0.1": 0.9877301375071209,
+          "0.5": 1.2368967533111572,
+          "0.9": 1.3775043646494545
+        }
+      },
+      "chronos2_lora": {
+        "n": 48,
+        "mae_bpm": 2.3915173212687173,
+        "rmse_bpm": 3.067548841026235,
+        "coverage_p10_p90": 1.0,
+        "mean_interval_width_bpm": 21.708441893259685,
+        "pinball_loss_bpm": {
+          "0.1": 0.9344910621643067,
+          "0.5": 1.1957586606343586,
+          "0.9": 1.2363531271616617
+        }
+      },
+      "persistence": {
+        "n": 48,
+        "mae_bpm": 2.8916659355163574,
+        "rmse_bpm": 3.666741455934871
+      },
+      "rolling_mean": {
+        "n": 48,
+        "mae_bpm": 2.5791675249735513,
+        "rmse_bpm": 3.4942018838844064
+      }
+    },
+    "per_horizon_minutes": {
+      "5": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 1.4117851257324219,
+          "rmse_bpm": 1.6028543901995367,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 11.798347473144531,
+          "pinball_loss_bpm": {
+            "0.1": 0.4926996231079102,
+            "0.5": 0.7058925628662109,
+            "0.9": 0.6871351242065429
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 1.2558536529541016,
+          "rmse_bpm": 1.4619207584065548,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 11.009984970092773,
+          "pinball_loss_bpm": {
+            "0.1": 0.4746208190917969,
+            "0.5": 0.6279268264770508,
+            "0.9": 0.6263776779174803
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 1.5,
+          "rmse_bpm": 1.618640745741373
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 2.0416622161865234,
+          "rmse_bpm": 2.936407739470911
+        }
+      },
+      "10": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 1.4765911102294922,
+          "rmse_bpm": 1.818072364183276,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 15.910015106201172,
+          "pinball_loss_bpm": {
+            "0.1": 0.5755779266357423,
+            "0.5": 0.7382955551147461,
+            "0.9": 1.0154235839843748
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 1.2775993347167969,
+          "rmse_bpm": 1.589097566242102,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 14.76803970336914,
+          "pinball_loss_bpm": {
+            "0.1": 0.5443210601806641,
+            "0.5": 0.6387996673583984,
+            "0.9": 0.9324829101562497
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 2.1499996185302734,
+          "rmse_bpm": 2.2825413725053396
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 2.8916664123535156,
+          "rmse_bpm": 4.290200675771129
+        }
+      },
+      "15": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 1.43292236328125,
+          "rmse_bpm": 2.425813489353835,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 18.306171417236328,
+          "pinball_loss_bpm": {
+            "0.1": 0.6851680755615235,
+            "0.5": 0.716461181640625,
+            "0.9": 1.145449066162109
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 1.45135498046875,
+          "rmse_bpm": 2.261329210298749,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 16.974958419799805,
+          "pinball_loss_bpm": {
+            "0.1": 0.6531118392944336,
+            "0.5": 0.725677490234375,
+            "0.9": 1.0443840026855464
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 1.9999980926513672,
+          "rmse_bpm": 2.75680781318836
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 3.758331298828125,
+          "rmse_bpm": 4.825191650802886
+        }
+      },
+      "20": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 2.2669906616210938,
+          "rmse_bpm": 2.3492679550473845,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 21.096383094787598,
+          "pinball_loss_bpm": {
+            "0.1": 0.8476698875427245,
+            "0.5": 1.1334953308105469,
+            "0.9": 1.261968421936035
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 2.0825366973876953,
+          "rmse_bpm": 2.212951040423704,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 19.351003646850586,
+          "pinball_loss_bpm": {
+            "0.1": 0.7999982833862306,
+            "0.5": 1.0412683486938477,
+            "0.9": 1.135102081298828
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 2.549999237060547,
+          "rmse_bpm": 2.7294681139948085
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 2.491666793823242,
+          "rmse_bpm": 2.914189659802689
+        }
+      },
+      "25": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 1.1550159454345703,
+          "rmse_bpm": 1.7682092230502762,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 23.34950065612793,
+          "pinball_loss_bpm": {
+            "0.1": 0.9402334213256837,
+            "0.5": 0.5775079727172852,
+            "0.9": 1.394716644287109
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 1.063741683959961,
+          "rmse_bpm": 1.5760181620685623,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 21.502248764038086,
+          "pinball_loss_bpm": {
+            "0.1": 0.8934803009033203,
+            "0.5": 0.5318708419799805,
+            "0.9": 1.2567445755004882
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 1.4000015258789062,
+          "rmse_bpm": 2.240536705844179
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 2.2083377838134766,
+          "rmse_bpm": 3.486525033106643
+        }
+      },
+      "30": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 4.034584045410156,
+          "rmse_bpm": 4.792582910461745,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 25.02874183654785,
+          "pinball_loss_bpm": {
+            "0.1": 1.4547258377075194,
+            "0.5": 2.017292022705078,
+            "0.9": 1.0481483459472654
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 4.116474151611328,
+          "rmse_bpm": 5.01134080851842,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 23.006072998046875,
+          "pinball_loss_bpm": {
+            "0.1": 1.3950374603271485,
+            "0.5": 2.058237075805664,
+            "0.9": 0.9055698394775389
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 3.299999237060547,
+          "rmse_bpm": 4.044748513758687
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 2.8583316802978516,
+          "rmse_bpm": 4.275019827460413
+        }
+      },
+      "35": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 3.4635772705078125,
+          "rmse_bpm": 4.340381297109408,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 26.080082893371582,
+          "pinball_loss_bpm": {
+            "0.1": 0.9386981010437013,
+            "0.5": 1.7317886352539062,
+            "0.9": 1.669310188293457
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 3.3298797607421875,
+          "rmse_bpm": 4.10894496651407,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 23.889999389648438,
+          "pinball_loss_bpm": {
+            "0.1": 0.8793493270874024,
+            "0.5": 1.6649398803710938,
+            "0.9": 1.5096506118774413
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 3.5,
+          "rmse_bpm": 4.917317023933718
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 3.5583362579345703,
+          "rmse_bpm": 4.215748516338808
+        }
+      },
+      "40": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 3.481403350830078,
+          "rmse_bpm": 3.9633043372703827,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 27.345794677734375,
+          "pinball_loss_bpm": {
+            "0.1": 1.2792022705078125,
+            "0.5": 1.740701675415039,
+            "0.9": 1.4553771972656246
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 3.553220748901367,
+          "rmse_bpm": 4.001279718254534,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 24.956092834472656,
+          "pinball_loss_bpm": {
+            "0.1": 1.2113456726074219,
+            "0.5": 1.7766103744506836,
+            "0.9": 1.2842636108398435
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 3.8999996185302734,
+          "rmse_bpm": 4.636809741367402
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 2.1250038146972656,
+          "rmse_bpm": 2.575368994295427
+        }
+      },
+      "45": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 2.9045372009277344,
+          "rmse_bpm": 3.38107626918151,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 27.190494537353516,
+          "pinball_loss_bpm": {
+            "0.1": 0.9009254455566407,
+            "0.5": 1.4522686004638672,
+            "0.9": 1.8181240081787107
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 2.647275924682617,
+          "rmse_bpm": 3.1037122758435047,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 24.869935989379883,
+          "pinball_loss_bpm": {
+            "0.1": 0.837865447998047,
+            "0.5": 1.3236379623413086,
+            "0.9": 1.649128150939941
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 3.1000003814697266,
+          "rmse_bpm": 4.284855329994896
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 4.158336639404297,
+          "rmse_bpm": 4.594837169067795
+        }
+      },
+      "50": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 3.1215953826904297,
+          "rmse_bpm": 3.3939043881122575,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 28.360849380493164,
+          "pinball_loss_bpm": {
+            "0.1": 1.1979045867919922,
+            "0.5": 1.5607976913452148,
+            "0.9": 1.6381803512573239
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 3.029764175415039,
+          "rmse_bpm": 3.369721080257977,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 26.085124969482422,
+          "pinball_loss_bpm": {
+            "0.1": 1.1317745208740235,
+            "0.5": 1.5148820877075195,
+            "0.9": 1.4767379760742185
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 3.9499969482421875,
+          "rmse_bpm": 4.446344344217419
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 1.908334732055664,
+          "rmse_bpm": 2.2134066748088217
+        }
+      },
+      "55": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 2.604402542114258,
+          "rmse_bpm": 3.0884305602986983,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 28.794286727905273,
+          "pinball_loss_bpm": {
+            "0.1": 1.28717098236084,
+            "0.5": 1.302201271057129,
+            "0.9": 1.5922576904296875
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 2.6995811462402344,
+          "rmse_bpm": 3.1250324614476113,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 26.287033081054688,
+          "pinball_loss_bpm": {
+            "0.1": 1.2175918579101563,
+            "0.5": 1.3497905731201172,
+            "0.9": 1.4111114501953121
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 3.4499969482421875,
+          "rmse_bpm": 3.894865793995107
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 1.408334732055664,
+          "rmse_bpm": 1.8830374133612975
+        }
+      },
+      "60": {
+        "chronos2_base": {
+          "n": 4,
+          "mae_bpm": 2.3321170806884766,
+          "rmse_bpm": 2.7064284349451833,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 30.567472457885742,
+          "pinball_loss_bpm": {
+            "0.1": 1.2527854919433594,
+            "0.5": 1.1660585403442383,
+            "0.9": 1.8039617538452146
+          }
+        },
+        "chronos2_lora": {
+          "n": 4,
+          "mae_bpm": 2.1909255981445312,
+          "rmse_bpm": 2.6457795105622592,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 27.80080795288086,
+          "pinball_loss_bpm": {
+            "0.1": 1.1753961563110353,
+            "0.5": 1.0954627990722656,
+            "0.9": 1.6046846389770504
+          }
+        },
+        "persistence": {
+          "n": 4,
+          "mae_bpm": 3.8999996185302734,
+          "rmse_bpm": 4.254407952940555
+        },
+        "rolling_mean": {
+          "n": 4,
+          "mae_bpm": 1.5416679382324219,
+          "rmse_bpm": 1.8209430559745297
+        }
+      }
+    },
+    "subject_macro_mae_bpm": {
+      "chronos2_base": 2.473793506622315,
+      "chronos2_lora": 2.3915173212687177,
+      "persistence": 2.891665935516357,
+      "rolling_mean": 2.5791675249735517
+    }
+  },
+  "test": {
+    "aggregate": {
+      "chronos2_base": {
+        "n": 60,
+        "mae_bpm": 4.5130573272705075,
+        "rmse_bpm": 5.783504833222513,
+        "coverage_p10_p90": 0.8333333333333334,
+        "mean_interval_width_bpm": 20.727789624532065,
+        "pinball_loss_bpm": {
+          "0.1": 1.3427412096659344,
+          "0.5": 2.2565286636352537,
+          "0.9": 1.1278568903605144
+        }
+      },
+      "chronos2_lora": {
+        "n": 60,
+        "mae_bpm": 4.576565806070963,
+        "rmse_bpm": 5.822821452871805,
+        "coverage_p10_p90": 0.8,
+        "mean_interval_width_bpm": 19.1130828221639,
+        "pinball_loss_bpm": {
+          "0.1": 1.299878635406494,
+          "0.5": 2.2882829030354817,
+          "0.9": 1.0794468434651692
+        }
+      },
+      "persistence": {
+        "n": 60,
+        "mae_bpm": 4.813334019978841,
+        "rmse_bpm": 6.297618613687366
+      },
+      "rolling_mean": {
+        "n": 60,
+        "mae_bpm": 5.204446792602539,
+        "rmse_bpm": 6.426353554522217
+      }
+    },
+    "per_horizon_minutes": {
+      "5": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 5.598442077636719,
+          "rmse_bpm": 7.350470020340236,
+          "coverage_p10_p90": 0.6,
+          "mean_interval_width_bpm": 11.796885681152343,
+          "pinball_loss_bpm": {
+            "0.1": 1.3472540283203127,
+            "0.5": 2.7992210388183594,
+            "0.9": 0.7518528747558593
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 5.553269958496093,
+          "rmse_bpm": 7.285463659863562,
+          "coverage_p10_p90": 0.6,
+          "mean_interval_width_bpm": 11.078282165527344,
+          "pinball_loss_bpm": {
+            "0.1": 1.3446658325195313,
+            "0.5": 2.7766349792480467,
+            "0.9": 0.8078019714355467
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 5.200001525878906,
+          "rmse_bpm": 7.400540463068671
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 3.553338623046875,
+          "rmse_bpm": 5.139760416524032
+        }
+      },
+      "10": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 5.492387390136718,
+          "rmse_bpm": 6.920391997115387,
+          "coverage_p10_p90": 0.4,
+          "mean_interval_width_bpm": 14.921917724609376,
+          "pinball_loss_bpm": {
+            "0.1": 1.6666671752929687,
+            "0.5": 2.746193695068359,
+            "0.9": 1.2546994018554687
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 5.509213256835937,
+          "rmse_bpm": 6.837578798604942,
+          "coverage_p10_p90": 0.4,
+          "mean_interval_width_bpm": 13.880400848388671,
+          "pinball_loss_bpm": {
+            "0.1": 1.6876030731201173,
+            "0.5": 2.7546066284179687,
+            "0.9": 1.332292785644531
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 5.039999389648438,
+          "rmse_bpm": 7.3745492529767915
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 5.593333435058594,
+          "rmse_bpm": 7.034089160103738
+        }
+      },
+      "15": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 4.091114807128906,
+          "rmse_bpm": 5.369834302395851,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 16.54348678588867,
+          "pinball_loss_bpm": {
+            "0.1": 1.094819107055664,
+            "0.5": 2.045557403564453,
+            "0.9": 1.0681614685058594
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 4.100794982910156,
+          "rmse_bpm": 5.311307179800388,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 15.414461517333985,
+          "pinball_loss_bpm": {
+            "0.1": 1.0969222259521485,
+            "0.5": 2.050397491455078,
+            "0.9": 0.9951205444335935
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 4.800001525878907,
+          "rmse_bpm": 6.605452635255716
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 5.9933349609375,
+          "rmse_bpm": 7.4214877347830885
+        }
+      },
+      "20": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 3.3650253295898436,
+          "rmse_bpm": 5.473677004809939,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 18.646975708007812,
+          "pinball_loss_bpm": {
+            "0.1": 1.3645687866210938,
+            "0.5": 1.6825126647949218,
+            "0.9": 1.1575628662109374
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 3.43936767578125,
+          "rmse_bpm": 5.38674596786063,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 17.247125244140626,
+          "pinball_loss_bpm": {
+            "0.1": 1.368907470703125,
+            "0.5": 1.719683837890625,
+            "0.9": 1.0714331054687496
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 4.000001525878906,
+          "rmse_bpm": 6.670532816548216
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 6.3933349609375,
+          "rmse_bpm": 7.5440794143208
+        }
+      },
+      "25": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 4.224490356445313,
+          "rmse_bpm": 5.0002867811701055,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 20.185231018066407,
+          "pinball_loss_bpm": {
+            "0.1": 0.8222241210937501,
+            "0.5": 2.1122451782226563,
+            "0.9": 1.2494667053222654
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 4.290473937988281,
+          "rmse_bpm": 4.966484187008751,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 18.67136001586914,
+          "pinball_loss_bpm": {
+            "0.1": 0.8138253021240235,
+            "0.5": 2.1452369689941406,
+            "0.9": 1.1574595642089842
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 4.720001220703125,
+          "rmse_bpm": 6.411239548927375
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 7.273335266113281,
+          "rmse_bpm": 8.35039625089795
+        }
+      },
+      "30": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 3.400164794921875,
+          "rmse_bpm": 4.428898885683354,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 21.326715087890626,
+          "pinball_loss_bpm": {
+            "0.1": 1.1477680969238282,
+            "0.5": 1.7000823974609376,
+            "0.9": 0.9849034118652342
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 3.585552978515625,
+          "rmse_bpm": 4.588137468519294,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 19.647990417480468,
+          "pinball_loss_bpm": {
+            "0.1": 1.0773370361328125,
+            "0.5": 1.7927764892578124,
+            "0.9": 0.8874620056152341
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 3.279998779296875,
+          "rmse_bpm": 4.238867240596827
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 6.540000915527344,
+          "rmse_bpm": 7.736048492758549
+        }
+      },
+      "35": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 4.300547790527344,
+          "rmse_bpm": 5.56121116656885,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 22.453367614746092,
+          "pinball_loss_bpm": {
+            "0.1": 1.3245274353027345,
+            "0.5": 2.150273895263672,
+            "0.9": 0.9208093261718748
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 4.37840576171875,
+          "rmse_bpm": 5.700351282444517,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 20.668942260742188,
+          "pinball_loss_bpm": {
+            "0.1": 1.255321044921875,
+            "0.5": 2.189202880859375,
+            "0.9": 0.8115731811523436
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 5.120001220703125,
+          "rmse_bpm": 6.075526798470045
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 4.513340759277344,
+          "rmse_bpm": 4.929485802279747
+        }
+      },
+      "40": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 7.311311340332031,
+          "rmse_bpm": 8.232812811923097,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 23.476968383789064,
+          "pinball_loss_bpm": {
+            "0.1": 1.7515391540527347,
+            "0.5": 3.6556556701660154,
+            "0.9": 1.5353407287597656
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 7.383505249023438,
+          "rmse_bpm": 8.348456551946175,
+          "coverage_p10_p90": 0.6,
+          "mean_interval_width_bpm": 21.548524475097658,
+          "pinball_loss_bpm": {
+            "0.1": 1.6756172180175781,
+            "0.5": 3.691752624511719,
+            "0.9": 1.5859765624999997
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 7.3600006103515625,
+          "rmse_bpm": 7.903417399569701
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 4.593333435058594,
+          "rmse_bpm": 5.904218120907217
+        }
+      },
+      "45": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 4.874330139160156,
+          "rmse_bpm": 6.104953364575276,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 23.32506561279297,
+          "pinball_loss_bpm": {
+            "0.1": 1.5472769165039062,
+            "0.5": 2.437165069580078,
+            "0.9": 0.7852296447753904
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 5.066520690917969,
+          "rmse_bpm": 6.303679140967933,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 21.466542053222657,
+          "pinball_loss_bpm": {
+            "0.1": 1.477815399169922,
+            "0.5": 2.5332603454589844,
+            "0.9": 0.6688388061523436
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 4.160002136230469,
+          "rmse_bpm": 5.333667033882895
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 5.339999389648438,
+          "rmse_bpm": 6.401337157543824
+        }
+      },
+      "50": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 2.213629150390625,
+          "rmse_bpm": 2.777734154809822,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 24.526954650878906,
+          "pinball_loss_bpm": {
+            "0.1": 1.3525479125976563,
+            "0.5": 1.1068145751953125,
+            "0.9": 1.1001475524902342
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 2.300634765625,
+          "rmse_bpm": 2.9590155714974564,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 22.584363555908205,
+          "pinball_loss_bpm": {
+            "0.1": 1.2785295867919924,
+            "0.5": 1.1503173828125,
+            "0.9": 0.9799067687988279
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 2.920001220703125,
+          "rmse_bpm": 3.4304533420310164
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 3.4733352661132812,
+          "rmse_bpm": 4.018100560473152
+        }
+      },
+      "55": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 4.386634826660156,
+          "rmse_bpm": 5.249783919769719,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 25.039529418945314,
+          "pinball_loss_bpm": {
+            "0.1": 1.3084004211425782,
+            "0.5": 2.193317413330078,
+            "0.9": 1.4623722839355464
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 4.386293029785156,
+          "rmse_bpm": 5.322450919144458,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 22.961753845214844,
+          "pinball_loss_bpm": {
+            "0.1": 1.2301766967773438,
+            "0.5": 2.193146514892578,
+            "0.9": 1.4485655212402342
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 5.6399993896484375,
+          "rmse_bpm": 6.499845382025347
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 4.233338928222656,
+          "rmse_bpm": 5.2890908335433675
+        }
+      },
+      "60": {
+        "chronos2_base": {
+          "n": 5,
+          "mae_bpm": 4.898609924316406,
+          "rmse_bpm": 4.979845286499455,
+          "coverage_p10_p90": 1.0,
+          "mean_interval_width_bpm": 26.490377807617186,
+          "pinball_loss_bpm": {
+            "0.1": 1.3853013610839846,
+            "0.5": 2.449304962158203,
+            "0.9": 1.263736419677734
+          }
+        },
+        "chronos2_lora": {
+          "n": 5,
+          "mae_bpm": 4.924757385253907,
+          "rmse_bpm": 5.007712612892677,
+          "coverage_p10_p90": 0.8,
+          "mean_interval_width_bpm": 24.187247467041015,
+          "pinball_loss_bpm": {
+            "0.1": 1.2918227386474608,
+            "0.5": 2.4623786926269533,
+            "0.9": 1.2069313049316404
+          }
+        },
+        "persistence": {
+          "n": 5,
+          "mae_bpm": 5.519999694824219,
+          "rmse_bpm": 6.142311403688924
+        },
+        "rolling_mean": {
+          "n": 5,
+          "mae_bpm": 4.953335571289062,
+          "rmse_bpm": 5.818690672859801
+        }
+      }
+    },
+    "subject_macro_mae_bpm": {
+      "chronos2_base": 4.5130573272705075,
+      "chronos2_lora": 4.576565806070963,
+      "persistence": 4.813334019978841,
+      "rolling_mean": 5.204446792602538
+    }
+  },
+  "clinical_validity": "not_evaluated",
+  "serving_model_changed": false,
+  "automatic_promotion": false,
+  "data_audit": {
+    "input_rows": 816,
+    "excluded_invalid_hr_rows": 1,
+    "segments": 58,
+    "eligible_segments": 29,
+    "excluded_short_segments": 29
+  },
+  "serialization_check": {
+    "adapter_reload_success": true,
+    "merged_reload_success": true,
+    "max_absolute_difference_bpm": 1.9073486328125e-05,
+    "base_revision_pinned": "29ec3766d36d6f73f0696f85560a422f50e8498c",
+    "subjects_checked": 5
+  },
+  "interpretation": "LoRA completed; test MAE did not improve; no automatic model promotion."
+}

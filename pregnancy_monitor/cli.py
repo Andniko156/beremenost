@@ -29,6 +29,28 @@ def build_parser():
     serve = sub.add_parser("serve", help="Run the private experimental forecast API")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
+    prepare = sub.add_parser("prepare-hrv29", help="Prepare reviewed pregnancy HR data with subject-disjoint splits")
+    prepare.add_argument("--input", help="Reviewed public Excel; downloaded if omitted")
+    prepare.add_argument("--output-dir", default="data/hrv29")
+    prepare.add_argument("--seed", type=int, default=42)
+    prepare.add_argument("--context-steps", type=int, default=6)
+    prepare.add_argument("--prediction-steps", type=int, default=12)
+    tune = sub.add_parser("finetune", help="Research-only LoRA adaptation; no API model promotion")
+    tune.add_argument("--dataset", required=True)
+    tune.add_argument("--output-dir", required=True)
+    tune.add_argument("--init-model", default=MODEL_ID)
+    tune.add_argument("--steps", type=int, default=100)
+    tune.add_argument("--batch-size", type=int, default=4)
+    tune.add_argument("--learning-rate", type=float, default=1e-5)
+    tune.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    tune.add_argument("--cpu-threads", type=int, default=4)
+    tune.add_argument("--seed", type=int, default=42)
+    tune.add_argument("--offline", action="store_true")
+    export = sub.add_parser("export-adapter", help="Restore a LoRA adapter as a merged model for another stage")
+    export.add_argument("--input", required=True)
+    export.add_argument("--output-dir", required=True)
+    export.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    export.add_argument("--offline", action="store_true")
     for command in ("forecast", "backtest", "benchmark"):
         run = sub.add_parser(command)
         run.add_argument("--input", required=True)
@@ -48,6 +70,24 @@ def build_parser():
 
 
 def run(args):
+    if args.command == "prepare-hrv29":
+        from .research_data import ResearchProfile, prepare_hrv29
+        manifest = prepare_hrv29(args.output_dir, args.input, args.seed,
+                                 ResearchProfile(context_steps=args.context_steps,
+                                                 prediction_steps=args.prediction_steps))
+        print(json.dumps({"source": manifest["source"]["dataset_id"], "audit": manifest["audit"],
+                          "subjects": {k: len(v) for k, v in manifest["splits"].items()}}, indent=2))
+        return
+    if args.command == "finetune":
+        from .finetuning import finetune
+        finetune(args.dataset, args.output_dir, init_model=args.init_model, num_steps=args.steps,
+                 batch_size=args.batch_size, learning_rate=args.learning_rate, device=args.device,
+                 cpu_threads=args.cpu_threads, seed=args.seed, offline=args.offline)
+        return
+    if args.command == "export-adapter":
+        from .finetuning import export_adapter
+        export_adapter(args.input, args.output_dir, args.device, args.offline)
+        return
     if args.command == "serve":
         try:
             import uvicorn
