@@ -61,6 +61,13 @@ Seed 42 фиксирует разбиение: **20 женщин train, 4 valida
 
 Полный сводный результат: [results/hrv29_lora_v1.json](results/hrv29_lora_v1.json).
 
+Следующий этап проверки выполнен на 24 development-участницах с отдельным
+внутренним выбором настроек; прежние пять тестовых женщин исключены.
+Протокол и результаты: [model_study.md](model_study.md). Начиная с версии 0.4,
+`finetune` выбирает checkpoint по MAE прогноза на validation с равным весом
+женщин. Для воспроизведения исторического запуска ниже явно указан
+`--selection-metric eval_loss`.
+
 ## Воспроизведение
 
 PowerShell, Python 3.12:
@@ -70,7 +77,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe -m pip install -e ".[finetune,test]"
 .\.venv\Scripts\python.exe -m pregnancy_monitor prepare-hrv29 --output-dir data/hrv29
-.\.venv\Scripts\python.exe -m pregnancy_monitor finetune --dataset data/hrv29 --output-dir outputs/hrv29_lora_v1 --steps 100 --batch-size 4 --cpu-threads 4
+.\.venv\Scripts\python.exe -m pregnancy_monitor finetune --dataset data/hrv29 --output-dir outputs/hrv29_lora_v1 --steps 100 --batch-size 4 --cpu-threads 4 --selection-metric eval_loss
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 

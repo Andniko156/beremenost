@@ -46,11 +46,20 @@ def build_parser():
     tune.add_argument("--cpu-threads", type=int, default=4)
     tune.add_argument("--seed", type=int, default=42)
     tune.add_argument("--offline", action="store_true")
+    tune.add_argument("--selection-metric", choices=["eval_forecast_mae", "eval_loss"], default="eval_forecast_mae")
     export = sub.add_parser("export-adapter", help="Restore a LoRA adapter as a merged model for another stage")
     export.add_argument("--input", required=True)
     export.add_argument("--output-dir", required=True)
     export.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     export.add_argument("--offline", action="store_true")
+    study = sub.add_parser("study", help="Nested development-only model selection; original test women excluded")
+    study.add_argument("--dataset", required=True)
+    study.add_argument("--output-dir", required=True)
+    study.add_argument("--steps", type=int, default=100)
+    study.add_argument("--seed", type=int, default=20261104)
+    study.add_argument("--cpu-threads", type=int, default=4)
+    study.add_argument("--minimum-relative-improvement", type=float, default=0.01)
+    study.add_argument("--offline", action="store_true")
     for command in ("forecast", "backtest", "benchmark"):
         run = sub.add_parser(command)
         run.add_argument("--input", required=True)
@@ -70,6 +79,12 @@ def build_parser():
 
 
 def run(args):
+    if args.command == "study":
+        from .model_study import run_study
+        run_study(args.dataset, args.output_dir, num_steps=args.steps, seed=args.seed,
+                  cpu_threads=args.cpu_threads, minimum_relative_improvement=args.minimum_relative_improvement,
+                  offline=args.offline)
+        return
     if args.command == "prepare-hrv29":
         from .research_data import ResearchProfile, prepare_hrv29
         manifest = prepare_hrv29(args.output_dir, args.input, args.seed,
@@ -82,7 +97,8 @@ def run(args):
         from .finetuning import finetune
         finetune(args.dataset, args.output_dir, init_model=args.init_model, num_steps=args.steps,
                  batch_size=args.batch_size, learning_rate=args.learning_rate, device=args.device,
-                 cpu_threads=args.cpu_threads, seed=args.seed, offline=args.offline)
+                 cpu_threads=args.cpu_threads, seed=args.seed, offline=args.offline,
+                 selection_metric=args.selection_metric)
         return
     if args.command == "export-adapter":
         from .finetuning import export_adapter
