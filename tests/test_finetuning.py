@@ -1,4 +1,5 @@
 import json
+import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
@@ -78,6 +79,7 @@ class ResearchDataTests(unittest.TestCase):
         np.testing.assert_allclose(train[0], np.arange(18) / 10 + 70)
         np.testing.assert_allclose(heldout[0]["values"], np.arange(6, 24) / 10 + 71)
 
+    @unittest.skipUnless(importlib.util.find_spec("torch"), "Requires optional model dependencies")
     def test_evaluation_exposes_context_only_and_baselines_have_no_fake_intervals(self):
         import torch
         observed = []
@@ -99,6 +101,7 @@ class ResearchDataTests(unittest.TestCase):
         self.assertNotIn("coverage_p10_p90", report["aggregate"]["persistence"])
         self.assertEqual(report["aggregate"]["spy"]["n"], 12)
 
+    @unittest.skipUnless(importlib.util.find_spec("torch"), "Requires optional model dependencies")
     def test_model_forecast_with_crossing_quantiles_is_rejected(self):
         import torch
 

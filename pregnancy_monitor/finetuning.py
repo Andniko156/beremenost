@@ -47,7 +47,8 @@ def evaluate_models(windows, profile, pipelines):
             raise ValueError("Model returned an unexpected number of predictions")
         for window, prediction in zip(windows, predictions):
             prediction = np.asarray(prediction)
-            if prediction.shape != (profile.prediction_steps, 3) or not np.isfinite(prediction[:, 1]).all():
+            if (prediction.shape != (profile.prediction_steps, 3)
+                    or not np.isfinite(prediction[:, 1]).all() or (prediction[:, 1] <= 0).any()):
                 raise ValueError("Invalid forecast shape or nonfinite point prediction")
             if name in pipelines and (not np.isfinite(prediction).all() or (np.diff(prediction, axis=1) < 0).any()):
                 raise ValueError("Invalid or crossing quantiles")
@@ -67,14 +68,91 @@ def evaluate_models(windows, profile, pipelines):
     return frame, report
 
 
+def fit_lora_model(base, train, validation, profile, output_dir, *, num_steps=100,
+                   batch_size=4, learning_rate=1e-5, rank=8, seed=42,
+                   selection_metric="eval_loss", parent_revision=MODEL_REVISION,
+                   validation_subjects=None):
+    """Train without reading any test observations; return the selected adapter and audit."""
+    import peft  # noqa: F401; required before upstream can silently fall back to full training
+    from chronos import Chronos2Pipeline
+    from transformers import TrainerCallback
+
+    if selection_metric not in {"eval_loss", "eval_forecast_mae"}:
+        raise ValueError("Unsupported model selection metric")
+    if type(rank) is not int or rank < 1:
+        raise ValueError("LoRA rank must be a positive integer")
+    if validation_subjects is None:
+        validation_subjects = list(range(len(validation)))
+    if len(validation_subjects) != len(validation):
+        raise ValueError("Validation subject IDs must match validation windows")
+    out = Path(output_dir)
+    events = {"selection_metric": selection_metric, "forecast_validation_history": []}
+
+    class LoraGuard(TrainerCallback):
+        def on_train_begin(self, args, state, control, model=None, **kwargs):
+            trainable = [(name, p) for name, p in model.named_parameters() if p.requires_grad]
+            if not trainable or not hasattr(model, "peft_config") or any("lora_" not in n for n, _ in trainable):
+                raise RuntimeError("Only LoRA parameters may be trained")
+            events["trainable_parameters"] = sum(p.numel() for _, p in trainable)
+            events["total_parameters"] = sum(p.numel() for p in model.parameters())
+            events["initial_adapter_sha256"] = _parameter_hash(model, trainable_only=True)
+
+        def on_evaluate(self, args, state, control, model=None, metrics=None, **kwargs):
+            if selection_metric != "eval_forecast_mae":
+                return
+            was_training = model.training
+            pipeline = Chronos2Pipeline(model=model)
+            qs, _ = pipeline.predict_quantiles(
+                [np.asarray(x, dtype=np.float32)[:-profile.prediction_steps] for x in validation],
+                context_length=profile.context_steps, prediction_length=profile.prediction_steps,
+                quantile_levels=QUANTILES, cross_learning=False, batch_size=8)
+            errors = [float(np.abs(q.detach().cpu().numpy()[0, :, 1] - x[-profile.prediction_steps:]).mean())
+                      for q, x in zip(qs, validation)]
+            if len(qs) != len(validation):
+                raise RuntimeError("Validation forecast count differs from validation targets")
+            value = float(pd.Series(errors).groupby(validation_subjects).mean().mean())
+            if not np.isfinite(value):
+                raise RuntimeError("Nonfinite validation forecast MAE")
+            metrics["eval_forecast_mae"] = value
+            events["forecast_validation_history"].append({"step": state.global_step, "mae_bpm": value})
+            model.train(was_training)
+
+        def on_train_end(self, args, state, control, **kwargs):
+            events["completed_steps"] = state.global_step
+            events["best_validation_checkpoint"] = state.best_model_checkpoint
+            events["best_validation_metric"] = state.best_metric
+            if selection_metric == "eval_loss":
+                events["best_validation_loss"] = state.best_metric
+            write_json(out / "trainer_history.json", state.log_history)
+
+    eval_steps = max(1, min(25, num_steps))
+    tuned = base.fit(train, prediction_length=profile.prediction_steps, validation_inputs=validation,
+                     context_length=profile.context_steps, min_past=profile.context_steps,
+                     finetune_mode="lora", lora_config={"r": rank, "lora_alpha": 2 * rank,
+                        "revision": parent_revision,
+                        "target_modules": ["self_attention.q", "self_attention.v", "self_attention.k",
+                                           "self_attention.o", "output_patch_embedding.output_layer"]},
+                     learning_rate=learning_rate, num_steps=num_steps, batch_size=batch_size,
+                     output_dir=out, finetuned_ckpt_name="adapter", callbacks=[LoraGuard()],
+                     optim="adamw_torch", eval_steps=eval_steps, save_steps=eval_steps,
+                     logging_steps=max(1, min(10, num_steps)), disable_tqdm=True, report_to="none",
+                     seed=seed, data_seed=seed, metric_for_best_model=selection_metric,
+                     greater_is_better=False)
+    events["final_adapter_sha256"] = _parameter_hash(tuned.model, trainable_only=True)
+    if events.get("completed_steps") != num_steps or events["initial_adapter_sha256"] == events["final_adapter_sha256"]:
+        raise RuntimeError("Adaptation did not complete or adapter parameters did not change")
+    return tuned, events
+
+
 def finetune(dataset_dir, output_dir, *, init_model=MODEL_ID, num_steps=100, batch_size=4,
-             learning_rate=1e-5, device="cpu", cpu_threads=4, seed=42, offline=False):
+             learning_rate=1e-5, device="cpu", cpu_threads=4, seed=42, offline=False,
+             selection_metric="eval_forecast_mae"):
     import torch
     # Upstream silently falls back to full fine-tuning without PEFT. This command must fail instead.
     try:
         import peft  # noqa: F401
         from chronos import Chronos2Pipeline
-        from transformers import TrainerCallback, set_seed
+        from transformers import set_seed
     except ImportError as exc:
         raise RuntimeError("Install .[finetune]; PEFT is required and full-training fallback is forbidden") from exc
 
@@ -126,38 +204,11 @@ def finetune(dataset_dir, output_dir, *, init_model=MODEL_ID, num_steps=100, bat
     # Make a resumed adapter point to the actual merged parent, never silently to the original base.
     base.model.config._name_or_path = init_model
     initial_base_hash = _parameter_hash(base.model)
-    events = {}
-
-    class LoraGuard(TrainerCallback):
-        def on_train_begin(self, args, state, control, model=None, **kwargs):
-            trainable = [(name, p) for name, p in model.named_parameters() if p.requires_grad]
-            if not trainable or not hasattr(model, "peft_config") or any("lora_" not in n for n, _ in trainable):
-                raise RuntimeError("Only LoRA parameters may be trained")
-            events["trainable_parameters"] = sum(p.numel() for _, p in trainable)
-            events["total_parameters"] = sum(p.numel() for p in model.parameters())
-            events["initial_adapter_sha256"] = _parameter_hash(model, trainable_only=True)
-
-        def on_train_end(self, args, state, control, **kwargs):
-            events["completed_steps"] = state.global_step
-            events["best_validation_checkpoint"] = state.best_model_checkpoint
-            events["best_validation_loss"] = state.best_metric
-            write_json(out / "trainer_history.json", state.log_history)
-
-    eval_steps = max(1, min(25, num_steps))
-    tuned = base.fit(train, prediction_length=profile.prediction_steps, validation_inputs=validation,
-                     context_length=profile.context_steps, min_past=profile.context_steps,
-                     finetune_mode="lora", lora_config={"r": 8, "lora_alpha": 16,
-                        "revision": MODEL_REVISION if init_model == MODEL_ID else None,
-                        "target_modules": ["self_attention.q", "self_attention.v", "self_attention.k",
-                                           "self_attention.o", "output_patch_embedding.output_layer"]},
-                     learning_rate=learning_rate, num_steps=num_steps, batch_size=batch_size,
-                     output_dir=out, finetuned_ckpt_name="adapter", callbacks=[LoraGuard()],
-                     optim="adamw_torch", eval_steps=eval_steps, save_steps=eval_steps,
-                     logging_steps=max(1, min(10, num_steps)), disable_tqdm=True, report_to="none",
-                     seed=seed, data_seed=seed)
-    events["final_adapter_sha256"] = _parameter_hash(tuned.model, trainable_only=True)
-    if events.get("completed_steps") != num_steps or events["initial_adapter_sha256"] == events["final_adapter_sha256"]:
-        raise RuntimeError("The requested adaptation did not complete or adapter parameters did not change")
+    tuned, events = fit_lora_model(base, train, validation, profile, out, num_steps=num_steps,
+                                   batch_size=batch_size, learning_rate=learning_rate, seed=seed,
+                                   parent_revision=MODEL_REVISION if init_model == MODEL_ID else None,
+                                   selection_metric=selection_metric,
+                                   validation_subjects=[row["subject_id"] for row in val_windows])
     events["base_pipeline_unchanged"] = _parameter_hash(base.model) == initial_base_hash
     if not events["base_pipeline_unchanged"]:
         raise RuntimeError("The original baseline pipeline was unexpectedly modified")
